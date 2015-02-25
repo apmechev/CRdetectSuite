@@ -100,7 +100,7 @@ def missfalsedets(time,mags,dets):
 		for val in mags[rampn]:
 			k+=1
 			if(val>0):
-				if (((k) in dets[rampn])):# or (k==len(mags[rampn]))):
+				if (((k) in dets[rampn])):
 					pass
 				else:
 					print('M'),
@@ -129,21 +129,6 @@ def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=
 		print "iterating over "+iterable+" using deviation from fit method for a sample size of "+str(numramps)+" ramps per point"
 
 	print " " 
-#	iterable=raw_input("What do you want on x-axis? ['rmpslope','nframes','cosmag','thresh'] ")
-#	itermin=int(raw_input("Min value of x-axis? "))
-#	itermax=int(raw_input("Max value of x-axis? "))
-#	interval=int(raw_input("x interval? "))
-
-#	if(not(iterable=='rmpslope')):
-#		rmpslope=raw_input("What is the ramp slope in DN? ")
-#	if(not(iterable=='nframes')):
-#		nframes=raw_input("What is the number of frames? ")
-#	if(not(iterable=='cosmag')):
-#       	cosmag=raw_input("What is the cosmic magnitude? ")
-#      if(not(iterable=='thresh')):
-#	        thresh=raw_input("What is the detection Threshold in sigma? ")
-
-#	exec(iterable + "= itermin") # sets the iterable variable to first value
 
 	false=numpy.zeros(len(numpy.arange(iterarray[1],iterarray[2],iterarray[3]))+1)
 	truedets=numpy.zeros(len(numpy.arange(iterarray[1],iterarray[2],iterarray[3]))+1)
@@ -207,17 +192,17 @@ def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslop
 	fd,=plt.plot(numpy.arange(iterarray[1],iterarray[2],iterarray[3]),falsepos,c='r',label='false detections')
 	ms,=plt.plot(numpy.arange(iterarray[1],iterarray[2],iterarray[3]),miss,c='k',label='missed cosmics')
 
-	plt.legend([fd, ms],["False detections","Missed Cosmic Rays"],loc=4)
+	plt.legend([fd, ms],["False detections","Missed Cosmic Rays"],loc=4,frameon=False)
 	plt.title("Missed cosmics and False detections for "+method+" method with "+str(numramps)+" runs per point")
 	plt.xlabel(str(iterarray[0])+" varied with a resolution of "+str(iterarray[3]))
 	plt.ylabel("Fraction of missed cosmics or False detections")	
 
 	fig = plt.gcf()
 	fig.set_size_inches(18.5,10.5)
-	fig.savefig('test2png.pdf',dpi=100)
+	fig.savefig(method+"_False_miss_.pdf",dpi=100)
 	plt.show()
 	
-	return 0
+	return [fd,ms]
 
 
 
