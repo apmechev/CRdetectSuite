@@ -16,9 +16,6 @@ rnd.seed(rnseed)
 
 def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed):
 	numhits=0
-	falsedets=numpy.zeros((100,20))
-	miss=numpy.zeros((100,20))
-
 
 	readN=numpy.zeros(nframes)
 	cosmagarray=[0]*len(readN)
@@ -26,8 +23,9 @@ def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed):
 
 	#add a number of cosmics based on poisson distribution
 	#size of cosmic taken from normal distribution
-	#magnitude csmcmag and SD of 5
-	for j in range(nframes):
+	#magnitude csmcmag and SD of 5. No cosmic in last frame. (because an increase
+	#in last frame means cosmic was in the nframes-1st frame.
+	for j in range(nframes-1):
 		numhits=rnd.poisson(0.1)
                 if (numhits>0):
                         readN[j]=j
@@ -109,6 +107,7 @@ def missfalsedets(time,mags,dets):
 				if(not((k+1) in dets[rampn])):
 					Tmissramp+=1
 					#print('X'),
+			
 
 		false.append(falseramp)
 		miss.append(missramp)
@@ -160,7 +159,7 @@ def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=
 def makeROC(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0 ):
 	f1,td1,M1,tm1,cm1=rampsiterate(numramps,method,iterarray,rmpslope,nframes,cosmag,thresh)
 	truepos=[td1[i]/cm1[i] for i in range(len(cm1)-1)]
-	falsepos=[f1[i]/(nframes*numramps-cm1[i]) for i in range(len(cm1)-1)]
+	falsepos=[f1[i]/((nframes-1)*numramps-cm1[i]) for i in range(len(cm1)-1)]
 	x=numpy.arange(0,1.01,0.01)
 	
 	plt.scatter(falsepos,truepos,marker="+",c='k')
@@ -186,7 +185,7 @@ def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslop
 
 	filename="plots_"+str(numramps)+"ramps_"+method+"_rmpslope="+str(rmpslope)+"_nframes="+str(nframes)+"_cosmag="+str(cosmag)+"_thresh="+str(thresh)+"_VAR_"+iterarray[0]+str(iterarray[1])+"->"+str(iterarray[2])
 	
-	falsepos=[f1[i]/(nframes*numramps-cm1[i]) for i in range(len(cm1)-1)]
+	falsepos=[f1[i]/((nframes-1)*numramps-cm1[i]) for i in range(len(cm1)-1)]
 	miss=[M1[i]/(cm1[i]) for i in range(len(cm1)-1)]
 
 	fd,=plt.plot(numpy.arange(iterarray[1],iterarray[2],iterarray[3]),falsepos,c='r',label='false detections')
@@ -205,7 +204,11 @@ def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslop
 	return [fd,ms]
 
 
-
+def iterate_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],iterarray2=['rmpslope',1,100,1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0):
+	
+	
+	
+	return 0
 
 
 
