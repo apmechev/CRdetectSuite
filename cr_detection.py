@@ -26,6 +26,55 @@ class cr_detection_class():
         self.readnoise = readnoise  #DN per read
 
 
+
+    def findCRs_qmeth(self, counts, rej_thr=0.2):
+        cr_readNs = []
+        # diff takes 1st-order differences between the elements of counts
+        diff = np.diff(counts)
+        rn2 = self.readnoise * self.readnoise
+        max_crs = len(diff)   # Upper limit, there won't be this many though...
+        cr_free=np.copy(counts)
+        cr_loc=[]
+
+        # See if there is a CR in all of these segments
+        for j in xrange(max_crs):
+            flag = 0
+
+            # Remove outliers we already found from diff by setting them to close to the minimum value of diff
+            diff = np.diff(cr_free)
+            if (len(cr_readNs) != 0):
+                cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
+                for i in range(len(cr_loc)):
+                        diff[cr_loc[i]]=min(diff+0.01) #gets rid of random zero
+
+            Qrange=(max(diff)-min(diff))
+
+            if (Qrange<=0):
+                break
+            Q1=(diff)/Qrange
+
+            meddiff = np.median(diff)
+            pnoise = sqrt(abs(meddiff) * self.gain) / self.gain
+            diff_unc = sqrt(pnoise*pnoise + rn2 + rn2)
+
+            # Calculate ratio to compare to rejection threshold
+            Q1sortindx = np.argsort(Q1)[::-1]
+
+
+            ratio = np.abs(diff[Q1sortindx[0]] - meddiff) / diff_unc
+            if ratio > rej_thr: # use normal rejection threshold to rejecm
+                    cr_readNs.append(Q1sortindx[0]+1)   # This is the frame the CR first appears in
+                    flag = 1
+            else: break
+            if (flag == 0): break   # We didn't find any outliers, so we are done
+
+
+
+        return cr_readNs
+
+
+
+
     def findCRs_2ptdiff(self, counts, rej_thr=3.0): 
         cr_readNs = []
         # diff takes 1st-order differences between the elements of counts
