@@ -14,7 +14,7 @@ rnseed=220022
 
 rnd.seed(rnseed)
 
-def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed):
+def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='f'):
 	numhits=0
 
 	readN=numpy.zeros(nframes)
@@ -29,7 +29,11 @@ def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed):
 		numhits=rnd.poisson(0.1)
                 if (numhits>0):
                         readN[j]=j
-                        magadd=numpy.abs(rnd.normal(csmcmag,5))
+                        
+			if cosmdist=='n':
+				magadd=numpy.abs(rnd.normal(csmcmag,5))
+			elif cosmdist=='f':
+				magadd=numpy.abs(rnd.uniform(1,csmcmag*2))
                         cosmagarray[j]=magadd*numhits
 			numhits=0
 
@@ -45,6 +49,8 @@ def detectCR(time,cnts,cnterr,method,threshold,cr_class):
 		detected=cr_class.findCRs_devfit(time,cnts,cnterr,threshold)
 	if (method=='yint'):
 		detected=cr_class.findCRs_yint(time,cnts,cnterr,threshold)	
+        if (method=='qt1'):
+                detected=cr_class.findCRs_qmeth(cnts,threshold)
 
 	return detected
 
@@ -126,6 +132,8 @@ def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=
                 print "iterating over "+iterable+" using y-intercept method for a sample size of "+str(numramps)+" ramps per point"
 	elif(method=='devfit'):
 		print "iterating over "+iterable+" using deviation from fit method for a sample size of "+str(numramps)+" ramps per point"
+        elif(method=='qt1'):
+                print "iterating over "+iterable+" using First order Q test for a sample size of "+str(numramps)+" ramps per point"
 
 	print " " 
 
