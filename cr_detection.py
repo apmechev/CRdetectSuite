@@ -188,11 +188,13 @@ class cr_detection_class():
                 counts = counts_in[start:end]
                 count_errors = count_errors_in[start:end]
 
-                # If ramp is too short, don't search for more CR's.
-                # In this case, the ramp was already divided by a CR which would be larger than any found here.
+                # If ramp is too short, ~~don't search for more CR's.~~ Implement 2pt
+                # 
                 if (end - start) < 3:
-                    goodflags = np.append(goodflags,sortedreadNs[i])
-                    continue
+                   #goodflags = np.append(goodflags,sortedreadNs[i])
+		   counts=np.append(time_in[start-1],counts)
+                   t2pread=self.findCRs_2ptdiff(counts,rej_thr)
+		   continue
 
                 # Now search for CRs
                 n_possible_crs = len(counts)-1
