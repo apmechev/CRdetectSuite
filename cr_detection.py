@@ -45,7 +45,7 @@ class cr_detection_class():
             if (len(cr_readNs) != 0):
                 cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
                 for i in range(len(cr_loc)):
-                        diff[cr_loc[i]]=min(diff+0.01) #gets rid of random zero
+                        diff[cr_loc[i]]=min(diff+0.01) #gets rid of divide by zero
 
             Qrange=(max(diff)-min(diff))
 
@@ -53,16 +53,10 @@ class cr_detection_class():
                 break
             Q1=(diff)/Qrange
 
-            meddiff = np.median(diff)
-            pnoise = sqrt(abs(meddiff) * self.gain) / self.gain
-            diff_unc = sqrt(pnoise*pnoise + rn2 + rn2)
-
             # Calculate ratio to compare to rejection threshold
             Q1sortindx = np.argsort(Q1)[::-1]
 
-
-            ratio = np.abs(diff[Q1sortindx[0]] - meddiff) / diff_unc
-            if ratio > rej_thr: # use normal rejection threshold to rejecm
+            if Q1[Q1sortindx[0]] < rej_thr: # use normal rejection threshold to rejecm
                     cr_readNs.append(Q1sortindx[0]+1)   # This is the frame the CR first appears in
                     flag = 1
             else: break
@@ -191,9 +185,9 @@ class cr_detection_class():
                 # If ramp is too short, ~~don't search for more CR's.~~ Implement 2pt
                 # 
                 if (end - start) < 3:
-                   #goodflags = np.append(goodflags,sortedreadNs[i])
-		   counts=np.append(time_in[start-1],counts)
-                   t2pread=self.findCRs_2ptdiff(counts,rej_thr)
+                   goodflags = np.append(goodflags,sortedreadNs[i])
+		   #counts=np.append(time_in[start-1],counts)
+                   #t2pread=self.findCRs_2ptdiff(counts,rej_thr)
 		   continue
 
                 # Now search for CRs
