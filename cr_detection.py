@@ -110,33 +110,33 @@ class cr_detection_class():
 
 #I call a ramp segment before/after a CR a 'semi-ramp'
 
-    def findCRs_devfit(self, time_in, counts_in, count_errors_in, rej_thr=3.0):
-	indx=self.devfitramp(time_in,counts_in,count_errors_in,rej_thr)
-	readNs=[]
-	if indx:
-		readNs.append(indx)
-		readNs=self.SplitRamp(time_in,counts_in,count_errors_in,0,indx,readNs,rej_thr)
-	return readNs
+##    def findCRs_devfit(self, time_in, counts_in, count_errors_in, rej_thr=3.0):
+#	indx=self.devfitramp(time_in,counts_in,count_errors_in,rej_thr)
+#	readNs=[]
+#	if indx:
+#		readNs.append(indx)
+#		readNs=self.SplitRamp(time_in,counts_in,count_errors_in,0,indx,readNs,rej_thr)
+#	return readNs
 
 
-    def SplitRamp(self,time_in,counts_in,cerr_in,begindex,index,readN,rej_thr):
+#   def SplitRamp(self,time_in,counts_in,cerr_in,begindex,index,readN,rej_thr):
 #	readN.append(index)
 #	import ipdb
 #	ipdb.set_trace()
-	if(len(time_in)<3):
-		return []
-	inlow=self.devfitramp(time_in[:index],counts_in[:index],cerr_in[:index],rej_thr)
-	if inlow:
-		readN.append(inlow+begindex)
-		readnslow=self.SplitRamp(time_in[:index],counts_in[:index],cerr_in[:index],begindex,inlow,readN,rej_thr)
+#	if(len(time_in)<3):
+#		return []
+#	inlow=self.devfitramp(time_in[:index],counts_in[:index],cerr_in[:index],rej_thr)
+#	if inlow:
+#		readN.append(inlow+begindex)
+#		readnslow=self.SplitRamp(time_in[:index],counts_in[:index],cerr_in[:index],begindex,inlow,readN,rej_thr)
 		
-	inupp=self.devfitramp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],rej_thr)
+#	inupp=self.devfitramp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],rej_thr)
 #	print(begindex,index,inlow,inupp)
-	if inupp:
-		readN.append(inupp+1+index+begindex)
-		readnshigh=self.SplitRamp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],index+1,inupp,readN,rej_thr)
+#	if inupp:
+#		readN.append(inupp+1+index+begindex)
+#		readnshigh=self.SplitRamp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],index+1,inupp,readN,rej_thr)
 
-	return readN
+#	return readN
 
     def devfitramp(self, time_in, counts_in, count_errors_in, rej_thr=3.0):
 #        import ipdb
@@ -160,14 +160,16 @@ class cr_detection_class():
                                                   #I add this as a marker (I will remove later)
         for iteration in xrange(len(counts_in)-1):   # For each possible semi-ramp
             sortedreadNs = np.sort(cr_readNs)  # I could have added a readN
-                                               #at the end which belongs between.
+	                                       #at the end which belongs between.
             for i in xrange(len(sortedreadNs)):  # I would loop over cr_readNs, but
                                                  #it is a growing array, instead
                                                  #I just have to break this once
                                                  #we loop over all semi-ramps
-                if sortedreadNs[i] in goodflags: continue  # This semi-ramp is fine
+                if sortedreadNs[i] in goodflags: 
+			#print(goodflags)	
+			continue  # This semi-ramp is fine
 
-                # Pick out CR free ramp segment
+		#Pick out CR free ramp segment
                 start = end = None
                 if (crcnt != 0):
                     if (i == 0):  # If this is the first CR..
@@ -177,17 +179,32 @@ class cr_detection_class():
                     end = sortedreadNs[i]+1     
                 else:
                     start = 0
-                    end = len(counts_in)  
-                time = time_in[start:end]
+                    end = len(counts_in) 
+		time = time_in[start:end]
                 counts = counts_in[start:end]
                 count_errors = count_errors_in[start:end]
 
-                # If ramp is too short, ~~don't search for more CR's.~~ Implement 2pt
-                # 
+                # If ramp is too short, maybe start is a cosmic not detected! 
+		#(low threshold won't catch this CR if we 'continue')
+		# ALSO, CRs don't seem to be detected at begin/end of semiramps!
                 if (end - start) < 3:
+		   b=0
                    goodflags = np.append(goodflags,sortedreadNs[i])
-		   #counts=np.append(time_in[start-1],counts)
-                   #t2pread=self.findCRs_2ptdiff(counts,rej_thr)
+		   #print "Gii= ",i,'startend=',start,end,'g',goodflags
+		   if(start in sortedreadNs):continue
+		   if(start == 0): continue
+		   t2pread=self.findCRs_2ptdiff(counts_in[(start-1):end],rej_thr)
+		   #print (t2pread+start)
+		   if (len(t2pread)==2):
+		   	if not((start+t2pread[0]-1) in sortedreadNs):
+				cr_readNs = np.append(cr_readNs,start + t2pread[0]-1)
+		                crcnt += 1
+				b=1
+			if (not((start +t2pread[1]-1) in sortedreadNs) and not(t2pread[1]==len(time_in)) ):
+                        	cr_readNs = np.append(cr_readNs,start + t2pread[1]-1)
+	                        crcnt += 1
+				b=1
+                        if b : break
 		   continue
 
                 # Now search for CRs
@@ -231,6 +248,84 @@ class cr_detection_class():
                 if ratio[rn2add] > rej_thr:
                     cr_readNs = np.append(cr_readNs,start + rn2add)  
                     crcnt += 1
+		    #print "i=",i,'startend=',start,end,'cr',start+rn2add
+                    break   # Every time a cr is found, go on to next iteration
+                else:
+                    goodflags = np.append(goodflags,sortedreadNs[i])  #the semi-ramp ending at this read number is good to go!
+                    if len(goodflags) == crcnt+1: break  
+
+        #remember, we put the last frame in cr_readNs so we need to remove it
+        to_rm = np.where(cr_readNs == len(counts_in)-1)[0][0]
+        if cr_readNs[to_rm] != len(counts_in)-1:  #it does not equal the last read
+            print 'The last item in list cr_readNs:',cr_readNs[to_rm],' is not the final read: ',len(counts)-1,'.  Do not remove it!'
+            sys.exit()
+        cr_readNs = np.delete(cr_readNs,to_rm)  
+        return cr_readNs + 1  # Jump is detected between frame before CR and frame after CR
+
+
+    def findCRs_devfit(self,time_in,counts_in,count_errors_in,rej_thr=3.0):
+        crcnt = 0
+        goodflags = np.empty(0)
+        cr_readNs = np.array([len(counts_in)-1])  # For the sake of dealing with the last semi-ramp
+                                                  #I add this as a marker (I will remove later)
+        for iteration in xrange(len(counts_in)-1):   # For each possible semi-ramp
+            sortedreadNs = np.sort(cr_readNs)  # I could have added a readN
+	                                       #at the end which belongs between.
+            for i in xrange(len(sortedreadNs)):  # I would loop over cr_readNs, but
+                                                 #it is a growing array, instead
+                                                 #I just have to break this once
+                                                 #we loop over all semi-ramps
+                if sortedreadNs[i] in goodflags: 
+			#print(goodflags)	
+			continue  # This semi-ramp is fine
+
+		#Pick out CR free ramp segment
+                start = end = None
+                if (crcnt != 0):
+                    if (i == 0):  # If this is the first CR..
+                        start = 0
+                    else:
+                        start = sortedreadNs[i-1]+1 
+                    end = sortedreadNs[i]+1     
+                else:
+                    start = 0
+                    end = len(counts_in) 
+		time = time_in[start:end]
+                counts = counts_in[start:end]
+                count_errors = count_errors_in[start:end]
+
+                # If ramp is too short, maybe start is a cosmic not detected! 
+		#(low threshold won't catch this CR if we 'continue')
+		# ALSO, CRs don't seem to be detected at begin/end of semiramps!
+                if (end - start) < 3:
+		   b=0
+                   goodflags = np.append(goodflags,sortedreadNs[i])
+		   #print "Gii= ",i,'startend=',start,end,'g',goodflags
+		   if(start in sortedreadNs):continue
+		   if(start == 0): continue
+		   t2pread=self.findCRs_2ptdiff(counts_in[(start-1):end],rej_thr)
+		   #print (t2pread+start)
+		   if (len(t2pread)==2):
+		   	if not((start + t2pread[0]-1) in sortedreadNs):
+				cr_readNs = np.append(cr_readNs,start + t2pread[0]-1)
+		                crcnt += 1
+				b=1
+			if not((start + t2pread[1]-1) in sortedreadNs):
+                        	cr_readNs = np.append(cr_readNs,start + t2pread[1]-1)
+	                        crcnt += 1
+				b=1
+                        if b : break
+
+		   continue
+
+                # Now search for CRs
+
+
+                cosmindex=self.devfitramp(time, counts,count_errors,rej_thr)
+                if cosmindex:
+                    cr_readNs = np.append(cr_readNs, start + cosmindex-1)  
+                    crcnt += 1
+		    #print "i=",i,'startend=',start,end,'cr',start+rn2add
                     break   # Every time a cr is found, go on to next iteration
                 else:
                     goodflags = np.append(goodflags,sortedreadNs[i])  #the semi-ramp ending at this read number is good to go!
