@@ -14,7 +14,7 @@ rnseed=220022
 
 rnd.seed(rnseed)
 
-def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='f'):
+def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='n'):
 	numhits=0
 
 	readN=numpy.zeros(nframes)
@@ -45,12 +45,15 @@ def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='f'):
 def detectCR(time,cnts,cnterr,method,threshold,cr_class):
 	if (method=='2pt'):
 		detected=cr_class.findCRs_2ptdiff(cnts,threshold)
-	if (method=='devfit'):
+	elif (method=='devfit'):
 		detected=cr_class.findCRs_devfit(time,cnts,cnterr,threshold)
-	if (method=='yint'):
+	elif (method=='yint'):
 		detected=cr_class.findCRs_yint(time,cnts,cnterr,threshold)	
-        if (method=='qt1'):
+        elif (method=='qt1'):
                 detected=cr_class.findCRs_qmeth(cnts,threshold)
+	else:
+		print "Invalid detection method"
+		return 0
 
 	return detected
 
@@ -164,7 +167,7 @@ def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=
 	return false,truedets,miss,truemiss,dets
 
 
-def makeROC(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0 ):
+def makeROC(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nframes=20,cosmag=10,thresh=3.0 ):
 	f1,td1,M1,tm1,cm1=rampsiterate(numramps,method,iterarray,rmpslope,nframes,cosmag,thresh)
 	truepos=[td1[i]/cm1[i] for i in range(len(cm1)-1)]
 	falsepos=[f1[i]/((nframes-1)*numramps-cm1[i]) for i in range(len(cm1)-1)]
@@ -172,7 +175,7 @@ def makeROC(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nf
 	
 	plt.scatter(falsepos,truepos,marker="+",c='k')
 	plt.plot(x,x,linestyle='--',c='r')
-	plt.title("ROC curve for "+method+" detection method varying the "+iterarray[0])
+	plt.title("ROC curve for "+method+" detection method varying the "+iterarray[0]+" crmag=10")
 	plt.ylabel("true positive rate (detections)/(cosmics)")
 	plt.xlabel('false positive rate (false detections)/(total points-cosmics)')
 	plt.grid(b=True,which='major',color='b',linestyle=':')
@@ -212,13 +215,58 @@ def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslop
 	return [fd,ms]
 
 
-def iterate_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],iterarray2=['rmpslope',1,100,1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0):
+def iterate_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],iterarray2=['rmpslope',1,100,10],rmpslope=20,nframes=20,cosmag=50,thresh=3.0):
 	
 	
 	
 	return 0
 
+def plot_rampfalsemiss(numramps, method='2pt', rmpslope=20,nframes=20,cosmag=50,thresh=2.0):
+        false=numpy.zeros(nframes)
+        miss=numpy.zeros(nframes)
+	cosmics=numpy.zeros(nframes)
+	det=numpy.zeros(nframes)
+        t1,c1,e1,mags,dets=runNramps(int(numramps),float(rmpslope),int(nframes),float(cosmag),method,float(thresh)) 
+	for rampm in range(len(t1)):
+	        for rampn in range(0,len(t1[rampm])):
+	                k=0
+	                for val in dets[rampm]:
+	                        if(mags[rampm][val-1]>0):
+					det[val]+=1
+	                                print('D'),
+	                        else:
+	                                print('F'),
+	                                false[val]+=1
 
+        	        for val in mags[rampm]:
+                	        k+=1
+                        	if(val>0):
+					cosmics[k]+=1
+					#print " EEEEEEEEE", k, dets[rampm]
+	                                if (((k) in dets[rampm])):
+	                                        pass
+	                                else:
+	                                        print('M'),
+	                                        miss[k]+=1
+	                        else:
+	                                if(not((k+1) in dets[rampm])):
+	                                        pass
+	                                        #print('X'),
+
+	import matplotlib.pyplot as plt
+	xred=[i-0.2 for i in range(0,len(false))]
+	xdet=[i-0.4 for i in range(0,len(det))]
+	xcosm=[i-0.6 for i in range(0,len(cosmics))]
+	xmiss=[i-0.8 for i in range(0,len(miss))]
+	mb=plt.bar(xmiss,miss,0.3,color='black')
+	fb=plt.bar(xred,false,0.2,color='red')
+	db=plt.bar(xdet,det,0.2,color='blue')
+	cb=plt.bar(xcosm,cosmics,0.2,color='green')
+	plt.legend([mb[0],fb[0],db[0],cb[0]],["missed","false","dets","cosmics"])
+	plt.title("number of detected,missed,false and cosmics versus ramp position")
+	plt.xlabel("Frame number")
+	plt.show()
+	return false,miss,det,cosmics
 
 
 
