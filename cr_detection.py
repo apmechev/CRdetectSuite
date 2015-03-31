@@ -16,6 +16,7 @@ Rachel E. Anderson, 2012
 from math import sqrt
 import random
 import numpy as np
+import operator
 
 class cr_detection_class():
 
@@ -25,6 +26,55 @@ class cr_detection_class():
         self.gain = gain  #e- per DN
         self.readnoise = readnoise  #DN per read
 
+    def findCRs_qmeth2(self, counts, rej_thr=0.2):
+        cr_readNs = []
+        # diff takes 1st-order differences between the elements of counts
+        diff = np.diff(counts) 
+        rn2 = self.readnoise * self.readnoise
+        max_crs = len(diff)   # Upper limit, there won't be this many though...
+        cr_free=np.copy(counts)
+        cr_loc=[]
+        
+        # See if there is a CR in all of these segments
+        for j in xrange(max_crs):
+            flag = 0
+            # Remove outliers we already found from diff by setting them to close to the minimum value of diff
+            diff = np.diff(cr_free)
+       	    diff2= [cr_free[i]-cr_free[i-2] for i in range(len(cr_free)-1,2,-1)]
+	    diff2= diff2[::-1]
+#   	    print len(diff2) 
+            if (len(cr_readNs) != 0):
+                cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
+                for i in range(len(cr_loc)):
+#			print cr_loc[i]
+                        diff[cr_loc[i]]=min(diff) #replaces 'cr' with minimum
+           		diff2[cr_loc[i]-2]=min(diff2) #replaces 'cr' with minimum
+ 
+            Qrange=(max(diff)-min(diff))
+	    Qrange2=(max(diff2)-min(diff2))
+            
+            if (Qrange<=0):
+                break
+            
+            Q1=np.diff(np.sort(diff))/Qrange
+	    Q2=np.diff(np.sort(diff2))/Qrange2
+            diffarg=np.argsort(diff)	
+	    diffarg2=np.argsort(diff2)
+            
+#           print Q1
+#           print diffarg
+            # Calculate ratio to compare to rejection threshold
+            max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))          
+	    max_index2, max_value2 = max(enumerate(np.argsort(diff2)), key=operator.itemgetter(1))            
+            if max(Q2) >  rej_thr: # use normal rejection threshold to rejecm
+                    if((diffarg2[max_value2]+1) in cr_readNs): break #sometimes triggers on already found CR     
+		    print diffarg2[max_value2]  	
+                    cr_readNs.append(diffarg2[max_value2])   # This is the frame the CR first appears in         
+                    flag = 1
+            else: break 
+            if (flag == 0): break   # We didn't find any outliers, so we are done
+	
+	return cr_readNs
 
 
     def findCRs_qmeth(self, counts, rej_thr=0.2):
@@ -39,25 +89,30 @@ class cr_detection_class():
         # See if there is a CR in all of these segments
         for j in xrange(max_crs):
             flag = 0
-
             # Remove outliers we already found from diff by setting them to close to the minimum value of diff
             diff = np.diff(cr_free)
+	    
             if (len(cr_readNs) != 0):
                 cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
                 for i in range(len(cr_loc)):
-                        diff[cr_loc[i]]=min(diff+0.01) #gets rid of divide by zero
+                        diff[cr_loc[i]]=min(diff) #replaces 'cr' with minimum
 
             Qrange=(max(diff)-min(diff))
 
             if (Qrange<=0):
                 break
-            Q1=(diff)/Qrange
 
+            Q1=np.diff(np.sort(diff))/Qrange
+	    diffarg=np.argsort(diff)
+	    
+#	    print Q1
+#	    print diffarg
             # Calculate ratio to compare to rejection threshold
-            Q1sortindx = np.argsort(Q1)[::-1]
-
-            if Q1[Q1sortindx[0]] < rej_thr: # use normal rejection threshold to rejecm
-                    cr_readNs.append(Q1sortindx[0]+1)   # This is the frame the CR first appears in
+            max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))
+	    
+            if max(Q1) >  rej_thr: # use normal rejection threshold to rejecm
+                    if((diffarg[max_value]+1) in cr_readNs): break #sometimes triggers on already found CR
+		    cr_readNs.append(diffarg[max_value]+1)   # This is the frame the CR first appears in
                     flag = 1
             else: break
             if (flag == 0): break   # We didn't find any outliers, so we are done
@@ -101,41 +156,6 @@ class cr_detection_class():
                 break   # If we find one break, if the largest isn't one, break.
             if (flag == 0): break   # We didn't find any outliers, so we are done
         return cr_readNs
-
-
-#We assume the CR is in each readN in turn and move the zero point to there,
-# calculate the slope and yintercepts for the two resulting semiramps,
-# and see if the difference of the yintercepts normalized by their errors
-# added in quatrature are within a threshold.
-
-#I call a ramp segment before/after a CR a 'semi-ramp'
-
-##    def findCRs_devfit(self, time_in, counts_in, count_errors_in, rej_thr=3.0):
-#	indx=self.devfitramp(time_in,counts_in,count_errors_in,rej_thr)
-#	readNs=[]
-#	if indx:
-#		readNs.append(indx)
-#		readNs=self.SplitRamp(time_in,counts_in,count_errors_in,0,indx,readNs,rej_thr)
-#	return readNs
-
-
-#   def SplitRamp(self,time_in,counts_in,cerr_in,begindex,index,readN,rej_thr):
-#	readN.append(index)
-#	import ipdb
-#	ipdb.set_trace()
-#	if(len(time_in)<3):
-#		return []
-#	inlow=self.devfitramp(time_in[:index],counts_in[:index],cerr_in[:index],rej_thr)
-#	if inlow:
-#		readN.append(inlow+begindex)
-#		readnslow=self.SplitRamp(time_in[:index],counts_in[:index],cerr_in[:index],begindex,inlow,readN,rej_thr)
-		
-#	inupp=self.devfitramp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],rej_thr)
-#	print(begindex,index,inlow,inupp)
-#	if inupp:
-#		readN.append(inupp+1+index+begindex)
-#		readnshigh=self.SplitRamp(time_in[(index+1):],counts_in[(index+1):],cerr_in[(index+1):],index+1,inupp,readN,rej_thr)
-
 #	return readN
 
     def devfitramp(self, time_in, counts_in, count_errors_in, rej_thr=3.0):
@@ -143,9 +163,14 @@ class cr_detection_class():
 #        ipdb.set_trace()
 	if(len(time_in)<3.):
 		return 0
-        fits,fitserr,fity,fityerr=self.fitline(time_in,counts_in, random_only=1)
-        dev=[(counts_in[i]-(fits*time_in[i]+fity))/(count_errors_in[i]) for i in range(len(time_in))]
-        diffdev=[np.absolute(dev[i]-dev[i-1]) for i in range(1,len(dev))]
+        fits,fitserr,fity,fityerr=self.fitline(time_in,counts_in, random_only=0)
+	pnoise = np.array([sqrt(abs(fits)*self.frame_t*self.gain)/self.gain for k in xrange(len(counts_in))])
+
+	count_errors_in=[np.sqrt(pnoise[i]*pnoise[i]+ self.readnoise*self.readnoise) for i in xrange(len(counts_in))]
+	dev=[(counts_in[i]-(fits*time_in[i]+fity))/(count_errors_in[i]) for i in range(len(time_in))]
+#        print dev
+	diffdev=[np.absolute(dev[i]-dev[i-1]) for i in range(1,len(dev))]
+#	print(diffdev)
         (mx,ind)=max((v,j) for j,v in enumerate(diffdev))
 	if (mx>rej_thr):
 		return (ind+1)
@@ -276,7 +301,7 @@ class cr_detection_class():
                                                  #I just have to break this once
                                                  #we loop over all semi-ramps
                 if sortedreadNs[i] in goodflags: 
-			#print(goodflags)	
+# 			print(goodflags)	
 			continue  # This semi-ramp is fine
 
 		#Pick out CR free ramp segment
@@ -293,18 +318,18 @@ class cr_detection_class():
 		time = time_in[start:end]
                 counts = counts_in[start:end]
                 count_errors = count_errors_in[start:end]
-
+		
                 # If ramp is too short, maybe start is a cosmic not detected! 
 		#(low threshold won't catch this CR if we 'continue')
 		# ALSO, CRs don't seem to be detected at begin/end of semiramps!
                 if (end - start) < 3:
 		   b=0
                    goodflags = np.append(goodflags,sortedreadNs[i])
-		   #print "Gii= ",i,'startend=',start,end,'g',goodflags
+#		   print "Gii= ",i,'startend=',start,end,'g',goodflags
 		   if(start in sortedreadNs):continue
 		   if(start == 0): continue
 		   t2pread=self.findCRs_2ptdiff(counts_in[(start-1):end],rej_thr)
-		   #print (t2pread+start)
+# 	 	   print (t2pread+start)
 		   if (len(t2pread)==2):
 		   	if not((start + t2pread[0]-1) in sortedreadNs):
 				cr_readNs = np.append(cr_readNs,start + t2pread[0]-1)
@@ -320,11 +345,16 @@ class cr_detection_class():
 
                 # Now search for CRs
 
+#	print 'start',start
+#		pnoise = np.array([sqrt(abs(slpavg[k])*self.frame_t*self.gain)/self.gain for k in xrange(len(slpavg))])
 
-                cosmindex=self.devfitramp(time, counts,count_errors,rej_thr)
+                #Add photon noise and readnoise in quadrature to get expected uncertainty in the y-intercept
+#                err_exp = np.array([sqrt(pnoise[k]*pnoise[k] + yint_err[0][k]*yint_err[0][k] + yint_err[1][k]*yint_err[1][k]) for k in xrange(len(pnoise))])   #we have two read's
+                cosmindex=self.devfitramp(time, counts,count_errors_in,rej_thr)
                 if cosmindex:
                     cr_readNs = np.append(cr_readNs, start + cosmindex-1)  
                     crcnt += 1
+	            #print cr_readNs
 		    #print "i=",i,'startend=',start,end,'cr',start+rn2add
                     break   # Every time a cr is found, go on to next iteration
                 else:
