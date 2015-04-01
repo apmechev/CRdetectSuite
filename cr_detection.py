@@ -40,8 +40,8 @@ class cr_detection_class():
             flag = 0
             # Remove outliers we already found from diff by setting them to close to the minimum value of diff
             diff = np.diff(cr_free)
-       	    diff2= [cr_free[i]-cr_free[i-2] for i in range(len(cr_free)-1,2,-1)]
-	    diff2= diff2[::-1]
+       	    diff2= [cr_free[i]-cr_free[i-2] for i in range(2,len(cr_free)-1,1)]
+#	    diff2= diff2[::-1]
 #   	    print len(diff2) 
             if (len(cr_readNs) != 0):
                 cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
@@ -58,6 +58,7 @@ class cr_detection_class():
             
             Q1=np.diff(np.sort(diff))/Qrange
 	    Q2=np.diff(np.sort(diff2))/Qrange2
+#	    print Q2
             diffarg=np.argsort(diff)	
 	    diffarg2=np.argsort(diff2)
             
@@ -66,10 +67,10 @@ class cr_detection_class():
             # Calculate ratio to compare to rejection threshold
             max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))          
 	    max_index2, max_value2 = max(enumerate(np.argsort(diff2)), key=operator.itemgetter(1))            
-            if max(Q2) >  rej_thr: # use normal rejection threshold to rejecm
+            if ((max(Q1) >  rej_thr) and (max(Q2)> (rej_thr/2.))): # use normal rejection threshold to rejecm
                     if((diffarg2[max_value2]+1) in cr_readNs): break #sometimes triggers on already found CR     
-		    print diffarg2[max_value2]  	
-                    cr_readNs.append(diffarg2[max_value2])   # This is the frame the CR first appears in         
+		    print(diffarg2[max_value2]+1)	
+                    cr_readNs.append(diffarg2[max_value2]+1)   # This is the frame the CR first appears in         
                     flag = 1
             else: break 
             if (flag == 0): break   # We didn't find any outliers, so we are done
@@ -87,7 +88,7 @@ class cr_detection_class():
         cr_loc=[]
 
         # See if there is a CR in all of these segments
-        for j in xrange(max_crs):
+        for j in xrange(max_crs):  
             flag = 0
             # Remove outliers we already found from diff by setting them to close to the minimum value of diff
             diff = np.diff(cr_free)
@@ -98,9 +99,10 @@ class cr_detection_class():
                         diff[cr_loc[i]]=min(diff) #replaces 'cr' with minimum
 
             Qrange=(max(diff)-min(diff))
+#Qrange=[max(numpy.delete(diff,i))-min(numpy.delete(diff,i))  for i in range(len(diff))]  sdiff=np.sort(diff)   Q1d=[(sdiff[i+1]-sdiff[i])/Qrange[i] for i in range(len(sdiff)-1)]
 
             if (Qrange<=0):
-                break
+                break 
 
             Q1=np.diff(np.sort(diff))/Qrange
 	    diffarg=np.argsort(diff)
@@ -110,7 +112,7 @@ class cr_detection_class():
             # Calculate ratio to compare to rejection threshold
             max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))
 	    
-            if max(Q1) >  rej_thr: # use normal rejection threshold to rejecm
+            if (Q1[-1]) >  rej_thr: # use normal rejection threshold to rejecm
                     if((diffarg[max_value]+1) in cr_readNs): break #sometimes triggers on already found CR
 		    cr_readNs.append(diffarg[max_value]+1)   # This is the frame the CR first appears in
                     flag = 1
