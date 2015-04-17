@@ -26,6 +26,95 @@ class cr_detection_class():
         self.gain = gain  #e- per DN
         self.readnoise = readnoise  #DN per read
 
+    def findCRs_GESD(self,counts,rej_thr=1.0):
+	cr_readNs = []
+        rn2 = self.readnoise * self.readnoise
+        diff = np.diff(counts)
+        max_crs = len(diff)
+
+        cr_free=np.copy(counts)
+	np.seterr(invalid='print')     #print errors with invalid thingy
+        for j in xrange(max_crs-1):
+            flag = 0
+	    
+            diff=np.diff(cr_free)
+
+            for i in range(len(cr_readNs)):
+                diff[cr_readNs[i]-1]=np.median(diff)
+#	    diff=np.diff(cr_free)	
+	    mean_j=np.mean(diff)
+	    sd_j=np.std(diff)
+
+	    G=max(np.abs(diff-mean_j))/float(sd_j)
+	    max_index=np.argsort(np.abs(diff-mean_j))[-1]
+	
+	    if (G>rej_thr) :
+		cr_readNs.append(max_index+1)
+	    else: break
+		
+	return cr_readNs
+
+    def findCRs_qmeth_mod(self, counts, rej_thr=0.2):
+        cr_readNs = []
+        # diff takes 1st-order differences between the elements of counts
+        diff = np.diff(counts)
+        rn2 = self.readnoise * self.readnoise
+        max_crs = len(diff)   # Upper limit, there won't be this many though...
+        cr_free=np.copy(counts)
+        cr_loc=[]
+
+        # See if there is a CR in all of these segments
+        for j in xrange(max_crs):
+            flag = 0
+            # Remove outliers we already found from diff by setting them to close to the minimum value of diff
+            diff = np.diff(cr_free)
+
+            if (len(cr_readNs) != 0):
+                cr_loc=[cr_readNs[i]-1 for i in range(len(cr_readNs))]
+                for i in range(len(cr_loc)):
+                        diff[cr_loc[i]]=np.mean(diff)+0.00001 #replaces 'cr' with minimum
+
+#            Qrange=(max(diff)-min(diff))
+	    Qrange=[max(np.delete(diff,i))-min(np.delete(diff,i))  for i in range(len(diff))] 
+#	    sdiff=np.sort(diff)
+#	    Q1d=[(sdiff[i+1]-sdiff[i]) for i in range(len(sdiff)-1)]
+	    Q1d=np.diff(np.sort(diff))
+
+	    argdiff=np.argmax(np.sort(diff))
+
+#                break  #If a CR is an outlier it will appear in the second half!
+            while(np.argmax(Q1d)<(len(Q1d)/2.)):
+		Q1d[np.argmax(Q1d)]=min(Q1d)
+
+
+	    diffarg=np.argsort(diff)
+	    Q1s=[0]*len(diffarg)
+	    for i, c in zip(diffarg[1:],Q1d): Q1s[i]=c
+
+	    Q1s=[Q1s[i]/Qrange[i+1] for i in range(0,len(Qrange)-1)]
+            if (Qrange<=0):
+                break
+
+
+#           print Q1
+#           print diffarg
+            # Calculate ratio to compare to rejection threshold
+            max_index, max_value = max(enumerate(Q1s), key=operator.itemgetter(1))
+
+            if (max_value) >  rej_thr: # use normal rejection threshold to rejecm
+                    if((max_index+1) in cr_readNs): break #sometimes triggers on already found CR
+                    cr_readNs.append(max_index+1)   # This is the frame the CR first appears in
+                    flag = 1
+            else: break
+            if (flag == 0): break   # We didn't find any outliers, so we are done
+
+
+
+        return cr_readNs
+    
+
+
+
     def findCRs_qmeth2(self, counts, rej_thr=0.2):
         cr_readNs = []
         # diff takes 1st-order differences between the elements of counts
@@ -61,16 +150,27 @@ class cr_detection_class():
 #	    print Q2
             diffarg=np.argsort(diff)	
 	    diffarg2=np.argsort(diff2)
-            
-#           print Q1
-#           print diffarg
-            # Calculate ratio to compare to rejection threshold
+ 
+            Q1s=[0]*len(diffarg)
+            Q2s=[0]*len(diffarg2)  #Q1s and Q2s are arrays of the q-values along the ramp
+
+	    for i, c in zip(diffarg[1:],Q1): Q1s[i]=c
+	    for i, c in zip(diffarg2[1:],Q2): Q2s[i]=c
+
+           
+
+
+           # Calculate ratio to compare to rejection threshold
             max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))          
 	    max_index2, max_value2 = max(enumerate(np.argsort(diff2)), key=operator.itemgetter(1))            
-            if ((max(Q1) >  rej_thr) and (max(Q2)> (rej_thr/2.))): # use normal rejection threshold to rejecm
-                    if((diffarg2[max_value2]+1) in cr_readNs): break #sometimes triggers on already found CR     
-		    print(diffarg2[max_value2]+1)	
-                    cr_readNs.append(diffarg2[max_value2]+1)   # This is the frame the CR first appears in         
+
+	    print diffarg2[max_value2],diffarg[max_value]
+            if ((Q1[-1]) >  rej_thr) and ((Q2[-1])> (rej_thr/2.)): # use normal rejection threshold to rejecm	
+		    cr=diffarg2[max_value2]+2
+		    if diffarg2[max_value2]==diffarg[max_value]: cr=diffarg2[max_value2]+1
+                    if(cr in cr_readNs): break #sometimes triggers on already found CR     
+		    print(cr)	
+                    cr_readNs.append(cr)   # This is the frame the CR first appears in         
                     flag = 1
             else: break 
             if (flag == 0): break   # We didn't find any outliers, so we are done
@@ -104,17 +204,25 @@ class cr_detection_class():
             if (Qrange<=0):
                 break 
 
-            Q1=np.diff(np.sort(diff))/Qrange
+            Q1=np.diff(np.sort(diff))/float(Qrange)
+	    if(np.argmax(Q1)<(len(Q1)/2.)  and (Q1[-1]<rej_thr)): #if trheshold fails at end but doesn't fail at the first half of the Q-ramp
+		break  #If a CR is an outlier it will appear in the second half!
+	    elif(np.argmax(Q1)<(len(Q1)/2.) and (Q1[-1]>rej_thr)):
+		Q1[np.argmax(Q1)]=min(Q1)
+
+
 	    diffarg=np.argsort(diff)
-	    
+	    Q1x=[0]*len(diffarg)
+            for i, c in zip(diffarg[1:],Q1): Q1x[i]=c
+ 
 #	    print Q1
 #	    print diffarg
             # Calculate ratio to compare to rejection threshold
-            max_index, max_value = max(enumerate(np.argsort(diff)), key=operator.itemgetter(1))
+            max_index, max_value = max(enumerate(Q1x), key=operator.itemgetter(1))
 	    
-            if (Q1[-1]) >  rej_thr: # use normal rejection threshold to rejecm
-                    if((diffarg[max_value]+1) in cr_readNs): break #sometimes triggers on already found CR
-		    cr_readNs.append(diffarg[max_value]+1)   # This is the frame the CR first appears in
+            if (max_value) >  rej_thr: # use normal rejection threshold to rejecm
+                    if((max_index+1) in cr_readNs): break #sometimes triggers on already found CR
+		    cr_readNs.append(max_index+1)   # This is the frame the CR first appears in
                     flag = 1
             else: break
             if (flag == 0): break   # We didn't find any outliers, so we are done

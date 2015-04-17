@@ -14,7 +14,7 @@ rnseed=213448622
 
 rnd.seed(rnseed)
 
-def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='n'):
+def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='n',nlinpwr=0):
 	numhits=0
 
 	readN=numpy.zeros(nframes)
@@ -39,14 +39,15 @@ def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='n'):
 
 
 
-#	for j in range(3):
+#	for j in range(1):
 #		wherehit=int(numpy.floor(numpy.random.uniform(0,nframes-1)))
 #		readN[wherehit]=wherehit
-#		cosmagarray[wherehit]=numpy.abs(rnd.normal(csmcmag,csmcmag/10.))
+#		cosmagarray[wherehit]=numpy.abs(rnd.normal(csmcmag,csmcmag/5.))
 	
 
 
-
+	if!nlinpwr:
+		cnts=[cnts[i]*((1-float(i+1)^(float(-nlinpwr)))) for i in range(len(cnts))]
 	time,cnts,cnterr = cr_class.mkramp(rmpslope,1,nframes,cosmagarray,readN)
 	
 	return (time,cnts,cnterr,cosmagarray)
@@ -61,8 +62,10 @@ def detectCR(time,cnts,cnterr,method,threshold,cr_class):
 		detected=cr_class.findCRs_yint(time,cnts,cnterr,threshold)	
         elif (method=='qt1'):
                 detected=cr_class.findCRs_qmeth(cnts,threshold)
-	elif (method=='test'):
-                detected=cr_class.findCRs_qmeth2(cnts,threshold)
+	elif (method=='qt1m'):
+                detected=cr_class.findCRs_qmeth_mod(cnts,threshold)
+	elif (method=='GESD'):
+                detected=cr_class.findCRs_GESD(cnts,threshold)
 	else:
 		print "Invalid detection method"
 		return 0
@@ -221,9 +224,9 @@ def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslop
 
 	fig = plt.gcf()
 	fig.set_size_inches(18.5,10.5)
-	fig.savefig(method+str(rmpslope)+"_False_miss_.pdf",dpi=100)
+#	fig.savefig(method+str(rmpslope)+"_False_miss_.pdf",dpi=100)
 #	plt.show()
-	
+	plt.close()	
 	return [falsepos,miss]
 
 
@@ -283,7 +286,7 @@ def plot_rampfalsemiss(numramps, method='2pt', rmpslope=20,nframes=20,cosmag=50,
         plt.legend([mb[0],fb[0],db[0]],["missed","false","dets"])
         plt.title("number of detected,missed,false and cosmics versus ramp position")
         plt.xlabel("Frame number")
-#        plt.show()
+        plt.show()
         return false,miss,det,cosmics
 	
 	
