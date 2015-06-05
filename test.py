@@ -5,8 +5,10 @@ import numpy
 import time as tm
 from scipy.integrate import simps
 import os
+import multiprocessing as mp
 
-frame_t=27.7		#default 27.7 (long exposure)
+
+frame_t=27.75		#default 27.7 (long exposure
 rdoutnoise=16/numpy.sqrt(8) #default 16/sqrt8 
 gain=5
 cr_class=cr_detection.cr_detection_class(rdoutnoise,gain,frame_t)
@@ -25,30 +27,33 @@ def makeramp(nframes,csmcmag,rmpslope,cr_class,rnseed,cosmdist='n',nlinpwr=0):
 	#size of cosmic taken from normal distribution
 	#magnitude csmcmag and SD of 5. No cosmic in last frame. (because an increase
 	#in last frame means cosmic was in the nframes-1st frame.
-	for j in range(nframes-1):
-		numhits=rnd.poisson(0.005)  #default 0.005 gives one cosmic per proper time period
-                if (numhits>0):
-                        readN[j]=j
-                        
-			if cosmdist=='n':
-				magadd=numpy.abs(rnd.normal(csmcmag,csmcmag/10.))
-			elif cosmdist=='f':
-				magadd=numpy.abs(rnd.uniform(1,csmcmag*2))
-                        cosmagarray[j]=magadd*numhits
-			numhits=0
+#	for j in range(nframes-1):
+#		numhits=rnd.poisson(0.008)  #default 0.008 gives one cosmic per proper time period
+#                if (numhits>0):
+#                        readN[j]=j
+#                        
+#			if cosmdist=='n':
+#				magadd=numpy.abs(rnd.normal(csmcmag,csmcmag/10.))
+#			elif cosmdist=='f':
+#				magadd=numpy.abs(rnd.uniform(1,csmcmag*2))
+#                        cosmagarray[j]=magadd*numhits
+#			numhits=0
 
 
 
-#	for j in range(1):
-#		wherehit=int(numpy.floor(numpy.random.uniform(0,nframes-1)))
-#		readN[wherehit]=wherehit
-#		cosmagarray[wherehit]=numpy.abs(rnd.normal(csmcmag,csmcmag/5.))
+	for j in range(1):
+		wherehit=int(numpy.floor(numpy.random.uniform(0,nframes-1)))
+		readN[wherehit]=wherehit
+		cosmagarray[wherehit]=numpy.abs(rnd.normal(csmcmag,csmcmag/5.))
 	
 
+	time,cnts,cnterr = cr_class.mkramp(rmpslope,2400,nframes,cosmagarray,readN)
+	if (nlinpwr)!=0:
+		cnts=[c[i]*(float((i+3)/float(27.75))**(float(-nlinpwr))) for i in range(len(c))]
+		max_cnts=max(cnts)
+		c=[c[i]*(cnts[i]/max_cnts) for i in range(len(cnts))]
 
-	if!nlinpwr:
-		cnts=[cnts[i]*((1-float(i+1)^(float(-nlinpwr)))) for i in range(len(cnts))]
-	time,cnts,cnterr = cr_class.mkramp(rmpslope,1,nframes,cosmagarray,readN)
+#	time,cnts,cnterr = cr_class.mkramp(rmpslope,1,nframes,cosmagarray,readN)
 	
 	return (time,cnts,cnterr,cosmagarray)
 
@@ -64,8 +69,12 @@ def detectCR(time,cnts,cnterr,method,threshold,cr_class):
                 detected=cr_class.findCRs_qmeth(cnts,threshold)
 	elif (method=='qt1m'):
                 detected=cr_class.findCRs_qmeth_mod(cnts,threshold)
+        elif (method=='qt2'):
+                detected=cr_class.findCRs_qmeth2(cnts,threshold)
 	elif (method=='GESD'):
                 detected=cr_class.findCRs_GESD(cnts,threshold)
+	elif (method=="IQR"):
+		detected=cr_class.findCRs_IQR(time,cnts,threshold)
 	else:
 		print "Invalid detection method"
 		return 0
@@ -73,7 +82,7 @@ def detectCR(time,cnts,cnterr,method,threshold,cr_class):
 	return detected
 
 
-def runNramps(numramps,rmpslope,nframes,cosmag=0,method='2pt',thresh=1.0):
+def runNramps(numramps,rmpslope,nframes,cosmag=0,method='2pt',thresh=1.0,dist='n'):
 	t_arr=[]
 	c_arr=[]
 	e_arr=[]
@@ -84,17 +93,52 @@ def runNramps(numramps,rmpslope,nframes,cosmag=0,method='2pt',thresh=1.0):
         e_arr.append([])
         m_arr.append([])
         d_arr.append([])
-	print 'creating ',numramps,' ramps'
+#	print 'creating ',numramps,' ramps'
 	for rampn in range(0,numramps):
-		t,c,e,m=makeramp(nframes,cosmag,rmpslope,cr_class,rnseed)
+		t,c,e,m=makeramp(nframes,cosmag,rmpslope,cr_class,rnseed,dist)
 		d=detectCR(t,c,e,method,thresh,cr_class)
 		t_arr[0].append(t)
 		c_arr[0].append(c)
 		e_arr[0].append(e)
 		m_arr[0].append(m)
 		d_arr[0].append(d)
-
+		#print rampn
 	return t_arr[0],c_arr[0],e_arr[0],m_arr[0],d_arr[0]
+
+
+def runPramps(numramps,rmpslope,nframes,cosmag=0,method='2pt',thresh=1.0):
+
+#	output = mp.Queue()
+#	processes = [mp.Process(target=runNramps, args=(numramps,rmpslope,nframes,cosmag,method,thresh)) for x in range(4)]
+#
+#	for p in processes:
+#		p.start()
+#		print "started", p
+#	output.get(False)
+#	for p in processes:
+#		p.join()
+#		print 'ended',p
+
+
+#	results = output.get(False)
+#	print(results)
+
+	pool = mp.Pool()
+#	results = [pool.apply(runNramps, args=(100,rmpslope,nframes,cosmag,method,thresh)) 
+
+	for x in range(1,(numramps)):
+		pool.apply(runNramps, args=(100,rmpslope,nframes,cosmag,method,thresh))
+
+
+	pool.close()
+	pool.join()
+	#r=[results[i].get(timeout=525600*60) for i in range(1000-1)]
+	print 'done main'	
+	
+	return results	
+
+
+
 
 
 def missfalsedets(time,mags,dets):
@@ -142,7 +186,7 @@ def missfalsedets(time,mags,dets):
 	return false,truedets,miss,truemiss,cosmics
 
 
-def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=50,nframes=20,cosmag=20,thresh=3.0):
+def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=50,nframes=20,cosmag=20,thresh=3.0,dist='n'):
         iterable=iterarray[0]
 	if(method=='2pt'):
                 print "iterating over "+iterable+" using 2-point difference method for a sample size of "+str(numramps)+" ramps per point"
@@ -168,7 +212,7 @@ def rampsiterate(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=
 		print iterarray[0]		
                 print iter1
 		
-		t1,c1,e1,m1,d1=runNramps(int(numramps),float(rmpslope),int(nframes),float(cosmag),method,float(thresh))
+		t1,c1,e1,m1,d1=runNramps(int(numramps),float(rmpslope),int(nframes),float(cosmag),method,float(thresh),dist)
 		f1,td1,M1,tm1,cn1=missfalsedets(t1,m1,d1)
 		
 		false[i]=numpy.sum(f1)
@@ -206,8 +250,8 @@ def makeROC(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=70,nf
 	return ROCAUC, [truepos, falsepos]
 
 
-def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0):
-	f1,td1,M1,tm1,cm1=rampsiterate(numramps,method,iterarray,rmpslope,nframes,cosmag,thresh)
+def plot_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],rmpslope=20,nframes=20,cosmag=50,thresh=3.0,dist='n'):
+	f1,td1,M1,tm1,cm1=rampsiterate(numramps,method,iterarray,rmpslope,nframes,cosmag,thresh,dist)
 
 	filename="plots_"+str(numramps)+"ramps_"+method+"_rmpslope="+str(rmpslope)+"_nframes="+str(nframes)+"_cosmag="+str(cosmag)+"_thresh="+str(thresh)+"_VAR_"+iterarray[0]+str(iterarray[1])+"->"+str(iterarray[2])
 	
@@ -236,12 +280,12 @@ def iterate_falsemiss(numramps,method='2pt',iterarray=['thresh',0.1,10,0.1],iter
 	
 	return 0
 
-def plot_rampfalsemiss(numramps, method='2pt', rmpslope=20,nframes=20,cosmag=50,thresh=2.0):
+def plot_rampfalsemiss(numramps, method='2pt', rmpslope=20,nframes=20,cosmag=50,thresh=2.0,dist='n'):
         false=numpy.zeros(nframes)
         miss=numpy.zeros(nframes)
 	cosmics=numpy.zeros(nframes)
 	det=numpy.zeros(nframes)
-        t1,c1,e1,mags,dets=runNramps(int(numramps),float(rmpslope),int(nframes),float(cosmag),method,float(thresh)) 
+        t1,c1,e1,mags,dets=runNramps(int(numramps),float(rmpslope),int(nframes),float(cosmag),method,float(thresh),dist) 
 	for rampm in range(len(t1)):
 	        for rampn in range(0,len(t1[rampm])):
 	                k=0
